@@ -23,6 +23,7 @@ import android.graphics.Rect;
 import android.hardware.Camera;
 import android.os.Build;
 import android.os.Handler;
+import android.util.Log;
 import android.view.SurfaceHolder;
 
 import java.io.IOException;
@@ -34,7 +35,7 @@ import java.io.IOException;
  */
 public final class CameraManager {
 
-    private static final String TAG = CameraManager.class.getSimpleName();
+    private static final String TAG = "CameraManager sniper";
 
     public static int FRAME_WIDTH = -1;
     public static int FRAME_HEIGHT = -1;
@@ -297,6 +298,7 @@ public final class CameraManager {
         Rect rect = getFramingRectInPreview();
         int previewFormat = configManager.getPreviewFormat();
         String previewFormatString = configManager.getPreviewFormatString();
+        Log.d(TAG, "buildLuminanceSource: " + previewFormatString);
         switch (previewFormat) {
             // This is the standard Android format which all devices are REQUIRED to support.
             // In theory, it's the only one we should ever care about.

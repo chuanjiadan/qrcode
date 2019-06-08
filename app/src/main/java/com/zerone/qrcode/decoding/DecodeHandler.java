@@ -37,10 +37,15 @@ import java.util.Hashtable;
 
 final class DecodeHandler extends Handler {
 
-    private static final String TAG = DecodeHandler.class.getSimpleName();
+    private static final String TAG = "DecodeHandler sniper";
 
     private final CaptureFragment fragment;
     private final MultiFormatReader multiFormatReader;
+
+    private Result mRawResult = null;
+    private byte[] mBytes;
+    private byte[] mRotatedData;
+    private long mStart;
 
     DecodeHandler(CaptureFragment fragment, Hashtable<DecodeHintType, Object> hints) {
         multiFormatReader = new MultiFormatReader();
@@ -50,9 +55,21 @@ final class DecodeHandler extends Handler {
 
     @Override
     public void handleMessage(Message message) {
+        Log.d(TAG, "handleMessage: " + message.what);
         if (message.what == R.id.decode) {
-            decode((byte[]) message.obj, message.arg1, message.arg2);
+            mStart = System.currentTimeMillis();
+            mBytes = (byte[]) message.obj;
+            Log.d(TAG, "handleMessage: 数组大小：" + mBytes.length);
+            if (mRotatedData == null || mRotatedData.length != mBytes.length) {
+                Log.d(TAG, "handleMessage: 创建专职数组");
+                mRotatedData = new byte[mBytes.length];
+            }
+            decode(message.arg1, message.arg2);
         } else if (message.what == R.id.quit) {
+            Log.d(TAG, "handleMessage: quit 推出");
+            mBytes = null;
+            mRotatedData = null;
+            mRawResult = null;
             Looper.myLooper().quit();
         }
     }
@@ -68,43 +85,43 @@ final class DecodeHandler extends Handler {
      *               <p>
      *               //todo 内存抖动
      */
-    private void decode(byte[] data, int width, int height) {
-        long start = System.currentTimeMillis();
-        Result rawResult = null;
-
+    private void decode(int width, int height) {
         //modify here
-        byte[] rotatedData = new byte[data.length];
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++)
-                rotatedData[x * height + height - y - 1] = data[x + y * width];
+                mRotatedData[x * height + height - y - 1] = mBytes[x + y * width];
         }
         int tmp = width; // Here we are swapping, that's the difference to #11
         width = height;
         height = tmp;
 
-        PlanarYUVLuminanceSource source = CameraManager.get().buildLuminanceSource(rotatedData, width, height);
+        PlanarYUVLuminanceSource source = CameraManager.get().buildLuminanceSource(mRotatedData, width, height);
         BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
         try {
-            rawResult = multiFormatReader.decodeWithState(bitmap);
+            mRawResult = multiFormatReader.decodeWithState(bitmap);
         } catch (ReaderException re) {
             // continue
         } finally {
             multiFormatReader.reset();
         }
 
-        if (rawResult != null) {
+        if (mRawResult != null) {
             long end = System.currentTimeMillis();
-            Log.d(TAG, "Found barcode (" + (end - start) + " ms):\n" + rawResult.toString());
-            Message message = Message.obtain(fragment.getHandler(), R.id.decode_succeeded, rawResult);
-            Bundle bundle = new Bundle();
-            bundle.putParcelable(DecodeThread.BARCODE_BITMAP, source.renderCroppedGreyscaleBitmap());
-            message.setData(bundle);
-            //Log.d(TAG, "Sending decode succeeded message...");
-            message.sendToTarget();
+            Log.d(TAG, "Found barcode (" + (end - mStart) + " ms):\n" + mRawResult.toString());
+            finishScaner(source);
         } else {
             Message message = Message.obtain(fragment.getHandler(), R.id.decode_failed);
             message.sendToTarget();
         }
+    }
+
+    private void finishScaner(PlanarYUVLuminanceSource source) {
+        Message message = Message.obtain(fragment.getHandler(), R.id.decode_succeeded, mRawResult);
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(DecodeThread.BARCODE_BITMAP, source.renderCroppedGreyscaleBitmap());
+        message.setData(bundle);
+        Log.d(TAG, "Sending decode succeeded message...");
+        message.sendToTarget();
     }
 
 }

@@ -18,10 +18,13 @@ package com.zerone.qrcode.decoding;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.DecodeHintType;
 import com.google.zxing.ResultPointCallback;
+import com.zerone.qrcode.MyApplication;
+import com.zerone.qrcode.cache.ImageCache;
 import com.zerone.qrcode.scaner.CaptureFragment;
 
 import java.util.Hashtable;
@@ -34,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 final class DecodeThread extends Thread {
 
     public static final String BARCODE_BITMAP = "barcode_bitmap";
+    private static final String TAG = "DecodeThread sniper";
     private final CaptureFragment fragment;
     private final Hashtable<DecodeHintType, Object> hints;
     private Handler handler;
@@ -76,7 +80,9 @@ final class DecodeThread extends Thread {
 
     @Override
     public void run() {
+        Log.d(TAG, "run: DecodeHandler");
         Looper.prepare();
+        ImageCache.getInstance().init(MyApplication.mContext);
         handler = new DecodeHandler(fragment, hints);
         handlerInitLatch.countDown();
         Looper.loop();
