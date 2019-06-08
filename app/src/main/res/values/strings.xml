@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">QrCode</string>
+    <string name="scaner">扫码</string>
 </resources>
