@@ -20,6 +20,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.ArrayMap;
 import android.util.Log;
 
 import com.google.zxing.BinaryBitmap;
@@ -33,8 +34,6 @@ import com.zerone.qrcode.camera.CameraManager;
 import com.zerone.qrcode.camera.PlanarYUVLuminanceSource;
 import com.zerone.qrcode.scaner.CaptureFragment;
 
-import java.util.Hashtable;
-
 final class DecodeHandler extends Handler {
 
     private static final String TAG = "DecodeHandler sniper";
@@ -46,8 +45,11 @@ final class DecodeHandler extends Handler {
     private byte[] mBytes;
     private byte[] mRotatedData;
     private long mStart;
+    private PlanarYUVLuminanceSource mSource;
+    private BinaryBitmap mBitmap;
+    private HybridBinarizer mHybridBinarizer;
 
-    DecodeHandler(CaptureFragment fragment, Hashtable<DecodeHintType, Object> hints) {
+    DecodeHandler(CaptureFragment fragment, ArrayMap<DecodeHintType, Object> hints) {
         multiFormatReader = new MultiFormatReader();
         multiFormatReader.setHints(hints);
         this.fragment = fragment;
@@ -95,10 +97,12 @@ final class DecodeHandler extends Handler {
         width = height;
         height = tmp;
 
-        PlanarYUVLuminanceSource source = CameraManager.get().buildLuminanceSource(mRotatedData, width, height);
-        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+        mSource = CameraManager.get().buildLuminanceSource(mRotatedData, width, height);
+        mHybridBinarizer = new HybridBinarizer(mSource);
+        mBitmap = new BinaryBitmap(mHybridBinarizer);
+
         try {
-            mRawResult = multiFormatReader.decodeWithState(bitmap);
+            mRawResult = multiFormatReader.decodeWithState(mBitmap);
         } catch (ReaderException re) {
             // continue
         } finally {
@@ -108,7 +112,7 @@ final class DecodeHandler extends Handler {
         if (mRawResult != null) {
             long end = System.currentTimeMillis();
             Log.d(TAG, "Found barcode (" + (end - mStart) + " ms):\n" + mRawResult.toString());
-            finishScaner(source);
+            finishScaner(mSource);
         } else {
             Message message = Message.obtain(fragment.getHandler(), R.id.decode_failed);
             message.sendToTarget();
